@@ -9,6 +9,7 @@ import sys
 import time
 import datetime
 import argparse
+import json
 
 from PIL import Image
 
@@ -54,6 +55,7 @@ if __name__ == "__main__":
 
     dataloader = DataLoader(
         ImageFolder(opt.image_folder, img_size=opt.img_size),
+        # ImageFolder(sorted(os.listdir(opt.image_folder)), img_size=opt.img_size),
         batch_size=opt.batch_size,
         shuffle=False,
         num_workers=opt.n_cpu,
@@ -92,6 +94,7 @@ if __name__ == "__main__":
     colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
     print("\nSaving images:")
+    submit = []
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
 
@@ -103,6 +106,8 @@ if __name__ == "__main__":
         fig, ax = plt.subplots(1)
         ax.imshow(img)
 
+        position = []
+        info = {'bbox': [], 'score': [], 'label': []}
         # Draw bounding boxes and labels of detections
         if detections is not None:
             # Rescale boxes to original image
@@ -113,6 +118,20 @@ if __name__ == "__main__":
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
 
                 print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
+
+                if x1 < 0:
+                    x1 = 0
+                if y1 < 0:
+                    y1 = 0
+                if x2 < 0:
+                    x2 = 0
+                if y2 < 0:
+                    y2 = 0
+
+                position.append([int(y1), int(x1), int(y2), int(x2)])
+                # info['bbox'].append(list("[{}, {}, {}, {}]".format(y1, x1, y2, x2)))
+                info['score'].append(cls_conf.item())
+                info['label'].append(int(classes[int(cls_pred)]))
 
                 box_w = x2 - x1
                 box_h = y2 - y1
@@ -131,11 +150,22 @@ if __name__ == "__main__":
                     verticalalignment="top",
                     bbox={"color": color, "pad": 0},
                 )
-
-        # Save generated image with detections
+            info['bbox'] = position
+            submit.append(info)
+        else:
+            info['bbox'] = position
+            submit.append(info)
+            
+        #Save generated image with detections
         plt.axis("off")
         plt.gca().xaxis.set_major_locator(NullLocator())
         plt.gca().yaxis.set_major_locator(NullLocator())
         filename = path.split("/")[-1].split(".")[0]
         plt.savefig(f"output/{filename}.png", bbox_inches="tight", pad_inches=0.0)
-        plt.close()
+        plt.close()    
+            
+            
+        
+    with open('submit.json', 'w') as fout:
+        json.dump(submit , fout)
+        
